@@ -1,6 +1,6 @@
 MODULE = shell_commands
 
-SRC = shell_commands.c sc_sys.c
+SRC = shell_commands.c sc_sys.c sc_mem.c
 
 ifneq (,$(filter config,$(USEMODULE)))
   SRC += sc_id.c
