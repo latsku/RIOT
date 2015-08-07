@@ -230,6 +230,19 @@ extern "C" {
 #define I2C_1_SDA_CLKEN()   (RCC->AHBENR |= RCC_AHBENR_GPIOBEN)
 /** @} */
 
+/**
+ * @name RTC configuration
+ * @{
+ */
+/**
+ * Uncomment the following line if your Nucleo has MB1136 C-02 or
+ * MB1136 C-03 -sticker on it. These newer versions have the required LSE
+ * oscillator provided on the X2 slot.
+ * See Nucleo User Manual UM1724 section 5.6.2.
+ */
+/* #define RTC_NUMOF           (1U) */
+/** @} */
+
 #ifdef __cplusplus
 }
 #endif
