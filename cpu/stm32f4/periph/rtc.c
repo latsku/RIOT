@@ -52,6 +52,14 @@ static uint8_t byte2bcd(uint8_t value);
 void rtc_init(void)
 {
 
+#ifndef CLOCK_RTC_LSI
+  #ifndef CLOCK_RTC_LSE
+    #ifndef CLOCK_RTC_HSE
+      #error "RTC clock source not defined. Define CLOCK_RTC_LSI, CLOCK_RTC_LSE, or CLOCK_RTC_HSE"
+    #endif
+  #endif
+#endif
+
     /* Enable write access to RTC registers */
     RCC->APB1ENR |= RCC_APB1ENR_PWREN;
     PWR->CR |= PWR_CR_DBP;
@@ -60,6 +68,11 @@ void rtc_init(void)
     RCC->BDCR |= RCC_BDCR_BDRST;
     RCC->BDCR &= ~(RCC_BDCR_BDRST);
 
+#ifdef CLOCK_RTC_LSI
+    /* Switch RTC to LSI clock source */
+    RCC->BDCR &= ~(RCC_BDCR_RTCSEL);
+    RCC->BDCR |= RCC_BDCR_RTCSEL_1;
+#elif CLOCK_RTC_LSE
     /* Enable the LSE clock (external 32.768 kHz oscillator) */
     RCC->BDCR &= ~(RCC_BDCR_LSEON);
     RCC->BDCR &= ~(RCC_BDCR_LSEBYP);
@@ -69,6 +82,12 @@ void rtc_init(void)
     /* Switch RTC to LSE clock source */
     RCC->BDCR &= ~(RCC_BDCR_RTCSEL);
     RCC->BDCR |= RCC_BDCR_RTCSEL_0;
+#elif CLOCK_RTC_HSE
+    /* Switch RTC to HSE clock source */
+    RCC->BDCR &= ~(RCC_BDCR_RTCSEL);
+    RCC->BDCR |= RCC_BDCR_RTCSEL_0;
+    RCC->BDCR |= RCC_BDCR_RTCSEL_1;
+#endif
 
     /* Enable the RTC */
     RCC->BDCR |= RCC_BDCR_RTCEN;
@@ -225,8 +244,11 @@ void rtc_poweroff(void)
     RCC->BDCR &= ~(RCC_BDCR_BDRST);
     /* Disable the RTC */
     RCC->BDCR &= ~RCC_BDCR_RTCEN;
+#ifdef CLOCK_RTC_LSE
     /* Disable LSE clock */
     RCC->BDCR &= ~(RCC_BDCR_LSEON);
+#endif
+
 }
 
 void isr_rtc_alarm(void)
