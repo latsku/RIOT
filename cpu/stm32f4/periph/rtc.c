@@ -65,8 +65,8 @@ void rtc_init(void)
     PWR->CR |= PWR_CR_DBP;
 
     /* Reset RTC domain */
-    RCC->BDCR |= RCC_BDCR_BDRST;
-    RCC->BDCR &= ~(RCC_BDCR_BDRST);
+//    RCC->BDCR |= RCC_BDCR_BDRST;
+//    RCC->BDCR &= ~(RCC_BDCR_BDRST);
 
 #ifdef CLOCK_RTC_LSI
     /* Switch RTC to LSI clock source */
