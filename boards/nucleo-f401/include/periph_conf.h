@@ -141,8 +141,8 @@ static const uart_conf_t uart_config[] = {
  * oscillator provided on the X2 slot.
  * See Nucleo User Manual UM1724 section 5.6.2.
  */
-// #define RTC_NUMOF           (1U)
-// #define CLOCK_RTC_LSE       (1)
+#define RTC_NUMOF           (1U)
+#define CLOCK_RTC_LSE       (1)
 /** @} */
 
 #ifdef __cplusplus
