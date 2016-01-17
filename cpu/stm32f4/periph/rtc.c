@@ -7,7 +7,7 @@
  */
 
 /**
- * @ingroup     cpu_stm32f3
+ * @ingroup     cpu_stm32f4
  * @{
  * @file
  * @brief       Low-level RTC driver implementation
@@ -45,8 +45,8 @@ static rtc_state_t rtc_callback;
 static uint8_t byte2bcd(uint8_t value);
 
 /**
- * @brief Initializes the RTC to use LSE (external 32.768 kHz oscillator) as a
- * clocl source. Verify that your board has this oscillator. If other clock
+ * @brief Initializes the RTC to use LSI, LSE or HSE as a
+ * clock source. Verify that your board has this oscillator. If other clock
  * source is used, then also the prescaler constants should be changed.
  */
 void rtc_init(void)
@@ -155,7 +155,7 @@ int rtc_get_time(struct tm *time)
     time->tm_mon  = (((RTC->DR & RTC_DR_MT)  >> 12) * 10) + ((RTC->DR & RTC_DR_MU)  >>  8) - 1;
     time->tm_mday = (((RTC->DR & RTC_DR_DT)  >>  4) * 10) + ((RTC->DR & RTC_DR_DU)  >>  0);
     time->tm_hour = (((RTC->TR & RTC_TR_HT)  >> 20) * 10) + ((RTC->TR & RTC_TR_HU)  >> 16);
-    if ( RTC->TR & RTC_TR_PM )
+    if ( !(RTC->CR & RTC_CR_FMT) && (RTC->TR & RTC_TR_PM) )
         time->tm_hour += 12;
     time->tm_min  = (((RTC->TR & RTC_TR_MNT) >> 12) * 10) + ((RTC->TR & RTC_TR_MNU) >>  8);
     time->tm_sec  = (((RTC->TR & RTC_TR_ST)  >>  4) * 10) + ((RTC->TR & RTC_TR_SU)  >>  0);
@@ -211,7 +211,7 @@ int rtc_get_alarm(struct tm *time)
     time->tm_mon  = (((RTC->DR     & RTC_DR_MT)      >> 12) * 10) + ((RTC->DR & RTC_DR_MU)          >>  8) - 1;
     time->tm_mday = (((RTC->ALRMAR & RTC_ALRMAR_DT)  >> 28) * 10) + ((RTC->ALRMAR & RTC_ALRMAR_DU)  >> 24);
     time->tm_hour = (((RTC->ALRMAR & RTC_ALRMAR_HT)  >> 20) * 10) + ((RTC->ALRMAR & RTC_ALRMAR_HU)  >> 16);
-    if ( (RTC->ALRMAR & RTC_ALRMAR_PM) && (RTC->CR & RTC_CR_FMT) )
+    if ( (RTC->CR & RTC_CR_FMT) && (RTC->ALRMAR & RTC_ALRMAR_PM) )
         time->tm_hour += 12;
     time->tm_min  = (((RTC->ALRMAR & RTC_ALRMAR_MNT) >> 12) * 10) + ((RTC->ALRMAR & RTC_ALRMAR_MNU) >>  8);
     time->tm_sec  = (((RTC->ALRMAR & RTC_ALRMAR_ST)  >>  4) * 10) + ((RTC->ALRMAR & RTC_ALRMAR_SU)  >>  0);
@@ -230,7 +230,7 @@ void rtc_clear_alarm(void)
 
 void rtc_poweron(void)
 {
-    /* RTC on STM32F0 is online even on sleep modes. No need to power on. */
+    /* RTC on STM32F4 is online even on sleep modes. No need to power on. */
 }
 
 void rtc_poweroff(void)
