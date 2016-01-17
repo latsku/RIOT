@@ -45,8 +45,6 @@
 #define LCD_5x10DOTS 0x04
 #define LCD_5x8DOTS 0x00
 
-#define LOW   0
-#define HIGH  1
 
   void LCD_send(uint8_t, uint8_t);
   void LCD_write4bits(uint8_t);

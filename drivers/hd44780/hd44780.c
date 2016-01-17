@@ -78,10 +78,10 @@ void LCD_begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
   // before sending commands. Arduino can turn on way before 4.5V so we'll wait 50
   xtimer_usleep(50000);
   // Now we pull both RS and R/W low to begin commands
-  gpio_write(_rs_pin, LOW);
-  gpio_write(_enable_pin, LOW);
+  gpio_clear(_rs_pin);
+  gpio_clear(_enable_pin);
   if (_rw_pin != 255) {
-    gpio_write(_rw_pin, LOW);
+    gpio_clear(_rw_pin);
   }
 
   //put the LCD into 4 bit or 8 bit mode
@@ -245,11 +245,11 @@ void LCD_createChar(uint8_t location, uint8_t charmap[]) {
 /*********** mid level commands, for sending data/cmds */
 
 inline void LCD_command(uint8_t value) {
-  LCD_send(value, LOW);
+  LCD_send(value, 0);
 }
 
 inline size_t LCD_write(uint8_t value) {
-  LCD_send(value, HIGH);
+  LCD_send(value, 1);
   return 1; // assume sucess
 }
 
@@ -261,7 +261,7 @@ void LCD_send(uint8_t value, uint8_t mode) {
 
   // if there is a RW pin indicated, set it low to Write
   if (_rw_pin != 255) {
-    gpio_write(_rw_pin, LOW);
+    gpio_clear(_rw_pin);
   }
 
   if (_displayfunction & LCD_8BITMODE) {
@@ -273,12 +273,12 @@ void LCD_send(uint8_t value, uint8_t mode) {
 }
 
 void LCD_pulseEnable(void) {
-  gpio_write(_enable_pin, LOW);
+  gpio_clear(_enable_pin);
   xtimer_usleep(1);
-  gpio_write(_enable_pin, HIGH);
+  gpio_set(_enable_pin);
   xtimer_usleep(1);    // enable pulse must be >450ns
-  gpio_write(_enable_pin, LOW);
-  xtimer_usleep(100);   // commands need > 37us to settle
+  gpio_clear(_enable_pin);
+  xtimer_usleep(50);   // commands need > 37us to settle
 }
 
 void LCD_write4bits(uint8_t value) {
