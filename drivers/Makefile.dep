@@ -79,3 +79,7 @@ ifneq (,$(filter xbee,$(USEMODULE)))
   USEMODULE += xtimer
   USEMODULE += netif
 endif
+
+ifneq (,$(filter hd44780,$(USEMODULE)))
+  USEMODULE += xtimer
+endif

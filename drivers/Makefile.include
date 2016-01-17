@@ -55,3 +55,6 @@ endif
 ifneq (,$(filter enc28j60,$(USEMODULE)))
     USEMODULE_INCLUDES += $(RIOTBASE)/drivers/enc28j60/include
 endif
+ifneq (,$(filter hd44780,$(USEMODULE)))
+    USEMODULE_INCLUDES += $(RIOTBASE)/drivers/hd44780/include
+endif
