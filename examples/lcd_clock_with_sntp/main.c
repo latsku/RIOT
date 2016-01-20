@@ -29,6 +29,7 @@
 #include "periph/rtc.h"
 #include "xtimer.h"
 #include "timex.h"
+#include "thread.h"
 
 #include "net/af.h"
 #include "net/gnrc.h"
@@ -41,20 +42,28 @@
 
 #define TM_YEAR_OFFSET              (1900)
 
+#define LCD_ROWS                    (4)
+#define LCD_COLUMNS                (20)
 
+#define TIMEDIFS                    (1)
+#define LCD_ALARM_CB                (0)
 
 /* Private variables ---------------------------------------------------------*/
-const char * defaultServerAddress = "2.pool.ntp.org";
+// const char * defaultServerAddress = "2.pool.ntp.org";
 const char * defaultServerIPv6Address = "fe80::219:e3ff:fe43:659c"; //2001:1bc8:101:e601::1"; //
 const char * defaultNetworkPort    = "123";
-static const int ITERATIONS = 3;
+static const int ITERATIONS = 1;    /* One iteration as there is no method to
+                                       compensate for network round-trip time or
+                                       other sources of jitter. */
 
 
 #define MAIN_QUEUE_SIZE     (8)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
 char lcd_thread_stack[THREAD_STACKSIZE_MAIN];
+#ifdef SNTP_THREAD
 char sNTP_stack[THREAD_STACKSIZE_MAIN];
+#endif
 
 int sntp_cmd(int argc, char** argv);
 
@@ -63,55 +72,83 @@ static const shell_command_t shell_commands[] = {
     { NULL, NULL, NULL }
 };
 
+#ifdef LCD_ALARM_CB
 
-void *update_lcd_cb(void *arg)
+void lcd_cb(void *arg)
 {
-    struct tm time;
+    disableIRQ();
+    (void)arg;
+
+    puts("Alarm!");
+
+    struct tm curr_time;
+    rtc_get_time(&curr_time);
+    LCD_home();
+
+    char string[LCD_COLUMNS] = { 0 };
+    snprintf(string, LCD_COLUMNS, "%04d-%02d-%02d %02d:%02d:%02d",
+                        curr_time.tm_year + TM_YEAR_OFFSET,
+                        curr_time.tm_mon + 1,
+                        curr_time.tm_mday,
+                        curr_time.tm_hour,
+                        curr_time.tm_min,
+                        curr_time.tm_sec);
+
+    for (int i=0; i<19; i++)
+        LCD_write(*(string+i));
+
+
+    curr_time.tm_sec  += 10;
+    rtc_set_alarm(&curr_time, lcd_cb, 0);
+
+    puts("Alarm set");
+//    printf("Alarm set to %02d:%02d:%02d.\n",
+//                        curr_time.tm_hour,
+//                        curr_time.tm_min,
+//                        curr_time.tm_sec);
+    enableIRQ();
+    return;
+}
+#endif
+
+void *thread_lcd(void *arg)
+{
+    struct tm curr_time;
     LCD_clear();
 
+#ifdef LCD_ALARM_CB
+    rtc_get_time(&curr_time);
+    curr_time.tm_sec  += 10;
+    rtc_set_alarm(&curr_time, lcd_cb, 0);
+
+    puts("Alarm set");
+//    printf("Alarm set to %02d:%02d:%02d.\n",
+//                        curr_time.tm_hour,
+//                        curr_time.tm_min,
+//                        curr_time.tm_sec);
+
+    thread_yield();
+
+#else
     while(1) {
-        rtc_get_time(&time);
+        rtc_get_time(&curr_time);
 
         LCD_home();
 
-        char string[8];
-        sprintf(string, "%04d", time.tm_year + TM_YEAR_OFFSET);
-        for (int i=0; i<4; i++) {
-            LCD_write(*(string+i));
-        }
-
-        LCD_write('-');
-        sprintf(string, "%02d", time.tm_mon + 1);
-        for (int i=0; i<2; i++)
-            LCD_write(*(string+i));
-
-        LCD_write('-');
-        sprintf(string, "%02d", time.tm_mday);
-        for (int i=0; i<2; i++)
+        char string[LCD_COLUMNS] = { 0 };
+        snprintf(string, LCD_COLUMNS, "%04d-%02d-%02d %02d:%02d:%02d",
+                                curr_time.tm_year + TM_YEAR_OFFSET,
+                                curr_time.tm_mon + 1,
+                                curr_time.tm_mday,
+                                curr_time.tm_hour,
+                                curr_time.tm_min,
+                                curr_time.tm_sec);
+        for (int i=0; i<19; i++)
             LCD_write(*(string+i));
 
-
-        LCD_write(' ');
-        sprintf(string, "%02d", time.tm_hour);
-        for (int i=0; i<2; i++) {
-            LCD_write(*(string+i));
-        }
-
-        LCD_write(':');
-        sprintf(string, "%02d", time.tm_min);
-        for (int i=0; i<2; i++)
-            LCD_write(*(string+i));
-
-        LCD_write(':');
-        sprintf(string, "%02d", time.tm_sec);
-        for (int i=0; i<2; i++)
-            LCD_write(*(string+i));
-
-
-//      time.tm_sec  += 1;
-//      rtc_set_alarm(&time, cb, 0);
         xtimer_usleep(1000000);
     }
+#endif
     return NULL;
 }
 
@@ -145,10 +182,15 @@ void *sntp_query(void *arg) {
     }
 
     time_t t;
-    struct tm *timestamp;
-//    timex_t start, stop;
+    struct tm *recv_time;
+    char result_addr_str[IPV6_ADDR_MAX_STR_LEN];
+#ifdef TIMEDIFS
+    timex_t start, stop;
+#endif
     for (int i = 0; i < ITERATIONS; i++ ) {
-//        xtimer_now_timex(&start);
+#ifdef TIMEDIFS
+        xtimer_now_timex(&start);
+#endif
 
         rc = conn_udp_sendto((void *)data, datalen,
                         &local_addr, sizeof(ipv6_addr_t),
@@ -169,37 +211,49 @@ void *sntp_query(void *arg) {
             err += 1;
         }
 
-//        char result_addr_str[IPV6_ADDR_MAX_STR_LEN];
-//        ipv6_addr_to_str(result_addr_str, &remote_addr, IPV6_ADDR_MAX_STR_LEN);
+        ipv6_addr_to_str(result_addr_str, &remote_addr, IPV6_ADDR_MAX_STR_LEN);
 
-
-//        xtimer_now_timex(&stop);
-//        stop = timex_sub(stop, start);
+#ifdef TIMEDIFS
+        xtimer_now_timex(&stop);
+        stop = timex_sub(stop, start);
+        timex_normalize(&stop);
+#endif
 
         t = sntpReadTimestamp((void *)data);
-        timestamp = localtime(&t);
-        timestamp->tm_hour += 2;
-        if ( err == 0 )
-            rtc_set_time(timestamp);
-        xtimer_sleep(2);
+        recv_time = localtime(&t);
+//        recv_time->tm_hour += 2;
+        if ( err == 0 ) {
+            t += 60*60*2;
+            recv_time = localtime(&t);
+            rtc_set_time(recv_time);
+            t -= 60*60*2;
+            recv_time = localtime(&t);
+        }
+        if ( i < (ITERATIONS-1))
+            xtimer_sleep(MINPOLL*MINPOLL);
 
-        //rtc_get_time(timestamp);
-        //t = mktime(timestamp);
-        sntpUpdatePacket((void *)data, t);
+        //rtc_get_time(recv_time);
+        //t = mktime(recv_time);
+#ifdef TIMEDIFS
+        sntpUpdatePacket((void *)data, t, stop.seconds);
+#else
+        sntpUpdatePacket((void *)data, t, 1);
+#endif
 
     }
 
     conn_udp_close(&udp_connection);
 
-    printf("Clock is %04d-%02d-%02d %02d:%02d:%02d\n",
-                                            timestamp->tm_year + TM_YEAR_OFFSET,
-                                            timestamp->tm_mon + 1,
-                                            timestamp->tm_mday,
-                                            timestamp->tm_hour,
-                                            timestamp->tm_min,
-                                            timestamp->tm_sec);
+    printf("Clock is %04d-%02d-%02d %02d:%02d:%02d received from %s.\n",
+                                            recv_time->tm_year + TM_YEAR_OFFSET,
+                                            recv_time->tm_mon + 1,
+                                            recv_time->tm_mday,
+                                            recv_time->tm_hour,
+                                            recv_time->tm_min,
+                                            recv_time->tm_sec,
+                                            result_addr_str);
 
-//    rtc_set_time(timestamp);
+//    rtc_set_time(recv_time);
 
     return 0;
 }
@@ -208,9 +262,13 @@ int sntp_cmd(int argc, char** argv) {
 
     puts("Start sNTP client... ");
 
+#ifdef SNTP_THREAD
     thread_create(sNTP_stack, sizeof(sNTP_stack),
                   THREAD_PRIORITY_MAIN, 0,
                   sntp_query, NULL, "sNTP");
+#else
+    sntp_query(NULL);
+#endif
 
     puts("done.");
 
@@ -227,16 +285,17 @@ int main(void)
     /* we need a message queue for the thread running the shell in order to
      * receive potentially fast incoming networking packets */
     msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
-    puts("RIOT network stack example application");
+    puts("LCD Clock with sNTP client !!!");
 
     LCD_init(GPIO_PIN(PORT_B, 8), 255, GPIO_PIN(PORT_B, 9), GPIO_PIN(PORT_A, 10), GPIO_PIN(PORT_B, 3), GPIO_PIN(PORT_B, 5), GPIO_PIN(PORT_B, 4));
-    LCD_begin(20, 4, LCD_5x10DOTS);
+    LCD_begin(LCD_COLUMNS, LCD_ROWS, LCD_5x10DOTS);
 
 
-    thread_create(lcd_thread_stack, sizeof(lcd_thread_stack), THREAD_PRIORITY_MAIN,
-                  0, update_lcd_cb, NULL, "lcd");
+    thread_create(lcd_thread_stack, sizeof(lcd_thread_stack),
+                    THREAD_PRIORITY_MAIN, 0,
+                    thread_lcd, NULL, "lcd");
 
-    sntp_query(NULL);
+     sntp_query(NULL);
 
 
     /* start shell */

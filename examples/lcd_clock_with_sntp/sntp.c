@@ -40,17 +40,26 @@ void sntpCreatePacket(void * buffer) {
 
 }
 
-void sntpUpdatePacket(void * buffer, uint32_t timestamp) {
+void sntpUpdatePacket(void * buffer, uint32_t timestamp, uint32_t delay) {
     ntp_t * x;
     x = (ntp_t *)buffer;
 
     x->flags        = (NOSYNC << 6) | (VERSION << 3) | (M_CLNT << 0);
+    x->rootdelay    = HTONL(delay << 16);
+    x->rootdisp     = HTONL(LOG2D(PRECISION) + LOG2D(PRECISION) + PHI * LFP2D(delay));
     x->org          = x->xmt;
     x->rec          = D2LFP(timestamp);
     x->xmt          = D2LFP(timestamp);
 }
 
 int sntpReadTimestamp(void * buffer) {
+    ntp_t * x;
+    x = (ntp_t *)buffer;
+
+    return (NTOHL(x->xmt) - JAN_1970);
+}
+
+int sntpReadFractions(void * buffer) {
     ntp_t * x;
     x = (ntp_t *)buffer;
 

@@ -51,7 +51,9 @@ typedef struct __attribute__ ((__packed__)) {
 #define MINPOLL         6       /* % minimum poll interval (64 s)*/
 #define MAXPOLL         17      /* % maximum poll interval (36.4 h) */
 
-#define PRECISION       -18     /* precision (log2 s)  */
+#define PRECISION       0       /* precision (log2 s) (  0 = 1s precision) */
+//#define PRECISION     -11       /* precision (log2 s) (-11 = 16 bit fraction of a second precision) */
+#define PHI             1       /* clock frequency */
 
 /* Protocol mode definition */
 #define M_CLNT          3       /* client */
@@ -60,9 +62,10 @@ typedef struct __attribute__ ((__packed__)) {
 
 /* Exported macro ------------------------------------------------------------*/
 #define D2LFP(a)   ((tstamp)((a) * FRAC))  /* NTP timestamp */
-
+#define LFP2D(a)   ((double)(a) / FRAC)
+#define LOG2D(a)   ((a) < 0 ? 1. / (1L << -(a)) : 1L << (a)) /* poll, etc. */
 
 /* Exported functions ------------------------------------------------------- */
 void sntpCreatePacket(void * buffer);
-void sntpUpdatePacket(void * buffer, uint32_t timestamp);
+void sntpUpdatePacket(void * buffer, uint32_t timestamp, uint32_t delay);
 int  sntpReadTimestamp(void * buffer);
